@@ -139,11 +139,15 @@ jobs:
       - name: kubeconfig
         run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
 
+      # --server-side=false: three-way merge jak w Helm 3. Server-side apply (domyślny w Helm 4)
+      # nadpisywałby albo blokował zmiany zrobione w klastrze ręcznie (kubectl annotate/set),
+      # np. listę inbound-cidrs na Ingressie ustawianą przez prowadzącego.
       - name: helm upgrade
         run: |
           helm version
           helm upgrade kantyna app/deploy/helm/kantyna \
             --namespace "$K8S_NAMESPACE" \
+            --server-side=false \
             --reuse-values \
             --set global.imageRegistry="$ECR_REGISTRY" \
             --set global.imageTag="$IMAGE_TAG" \
