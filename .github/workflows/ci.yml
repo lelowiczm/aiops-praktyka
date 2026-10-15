@@ -161,18 +161,14 @@ jobs:
           kubectl -n "$K8S_NAMESPACE" get deploy \
             -o custom-columns='NAME:.metadata.name,IMAGE:.spec.template.spec.containers[0].image'
 
+      # Z poda web: NetworkPolicy wpuszcza ruch do orders-api tylko z web (jak prawdziwe żądania /api).
       - name: smoke test /healthz
         run: |
-          kubectl -n "$K8S_NAMESPACE" exec deploy/kantyna-orders-api -- python -c '
-          import sys, urllib.request
-          urls = [
-              "http://kantyna-orders-api:8000/healthz",
-              "http://kantyna-payments:8080/healthz",
-              "http://kantyna-web:8080/healthz",
-          ]
-          for url in urls:
-              status = urllib.request.urlopen(url, timeout=5).status
-              print(url, status)
-              if status != 200:
-                  sys.exit(1)
-          '
+          for url in \
+            http://kantyna-web:8080/healthz \
+            http://kantyna-orders-api:8000/healthz \
+            http://kantyna-payments:8080/healthz; do
+            echo ">> $url"
+            kubectl -n "$K8S_NAMESPACE" exec deploy/kantyna-web -- wget -q -T 5 -O - "$url"
+            echo
+          done
