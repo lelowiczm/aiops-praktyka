@@ -272,6 +272,12 @@ metrics:
     labels:
       release: kube-prometheus-stack
 
+# Dodatkowe źródła ruchu do orders-api (web, loadgen, Prometheus z monitoringNamespace).
+networkPolicy:
+  ordersApi:
+    enabled: true
+    monitoringNamespace: monitoring
+
 prometheusRule:
   enabled: false
   labels:

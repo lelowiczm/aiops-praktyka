@@ -1,0 +1,39 @@
+{{- /* Pipeline robi `helm upgrade --reuse-values`, więc w wartościach starego wydania
+       klucza networkPolicy może nie być: domyślnie polityka jest włączona. */}}
+{{- $np := dig "ordersApi" dict (.Values.networkPolicy | default dict) }}
+{{- $enabled := dig "enabled" true $np }}
+{{- $monitoringNamespace := dig "monitoringNamespace" "monitoring" $np }}
+{{- if and .Values.ordersApi.enabled $enabled }}
+{{- $component := "orders-api" }}
+{{- $ctx := dict "ctx" $ "component" $component }}
+# Ruch do orders-api: web (żądania /api), loadgen (ruch syntetyczny) i Prometheus (scrape /metrics).
+# NetworkPolicy się sumują: ta polityka dodaje dozwolone źródła do istniejących, niczego nie zabiera.
+# Bez wpisu dla Prometheusa orders-api znika z monitoringu (up=0, TargetDown) i alerty
+# oparte na jego metrykach (np. KantynaDBPoolExhausted) nie mogą się odpalić.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kantyna.componentName" $ctx }}-netpol
+  labels:
+    {{- include "kantyna.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kantyna.selectorLabels" $ctx | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "kantyna.selectorLabels" (dict "ctx" $ "component" "web") | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              {{- include "kantyna.selectorLabels" (dict "ctx" $ "component" "loadgen") | nindent 14 }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $monitoringNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.ordersApi.service.port }}
+{{- end }}
